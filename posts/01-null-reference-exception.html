@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>[Nhật Ký Lao Công #01] NullReferenceException – Ai cho các anh thò tay vào hư vô?</title>
-  <meta name="description" content="Hồ sơ hiện trường số 01: Bóc trần thảm họa NullReferenceException trong C# và cơ chế ngắt phần cứng của .NET CLR.">
+  <title>🧹 [Nhật Ký Lao Công #01] NullReferenceException – Ai cho các anh thò tay vào hư vô?</title>
+  <meta name="description" content="Hồ sơ hiện trường số 01: Bóc trần thảm họa NullReferenceException trong C#, phân định vai trò giữa GC, Roslyn Compiler, .NET Runtime và OS/CPU.">
   <link rel="stylesheet" href="../style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧹</text></svg>">
 </head>
@@ -17,8 +17,8 @@
         <div class="site-title"><a href="../">Nhật Ký Lao Công</a></div>
       </div>
       <nav>
-        <a href="../">← Tất cả bài viết</a>
-        <a href="https://github.com/dannie203" target="_blank" rel="noopener">GitHub</a>
+        <a href="../">← Trang chủ</a>
+        <a href="01-null-reference-exception-en.html" class="lang-switch">🇬🇧 English</a>
       </nav>
     </div>
   </header>
@@ -26,105 +26,368 @@
   <main class="container">
     <article>
       <div class="article-header">
-        <div class="post-meta">
-          <span class="tag">#CSharp</span>
-          <span class="tag">#DotNet</span>
-          <span class="tag">#Runtime</span>
-          <span>17/09/2026</span>
+        <div class="article-header-meta">
+          <div class="post-meta" style="margin-bottom: 0;">
+            <span class="tag">#CSharp</span>
+            <span class="tag">#DotNet</span>
+            <span class="tag">#Runtime</span>
+            <span>17/09/2026</span>
+          </div>
+          <a href="01-null-reference-exception-en.html" class="lang-switch">🇬🇧 English</a>
         </div>
-        <h1>[Nhật Ký Lao Công #01] NullReferenceException – Ai cho các anh thò tay vào hư vô?</h1>
+        <h1>🧹 [Nhật Ký Lao Công #01] NullReferenceException – Ai cho các anh thò tay vào hư vô?</h1>
       </div>
 
       <div class="incident-box">
         <ul>
           <li><strong>Thời gian:</strong> 17h05 chiều thứ Sáu</li>
           <li><strong>Hiện trường:</strong> Production Server</li>
-          <li><strong>Nạn nhân:</strong> Ứng dụng thanh toán điện tử</li>
-          <li><strong>Hung thủ:</strong> Một thanh niên Junior vừa bấm nút deploy để về quê ăn cưới</li>
+          <li><strong>Nạn nhân:</strong> Hệ thống Cổng thanh toán</li>
+          <li><strong>Hung thủ:</strong> Một thanh niên Junior vừa bấm nút deploy để kịp về quê ăn cưới</li>
         </ul>
       </div>
 
       <div class="article-content">
         <blockquote>
-          "Bạn đưa cho cỗ máy một tờ séc khống. Nó mang ra ngân hàng rút tiền không được. Thay vì đi về, nó quyết định... nổ tung cả toà nhà."
+          "Các anh đưa cho người ta một địa chỉ nhà ma. Người ta đến nơi không thấy phòng, vậy mà vẫn cố mở cửa. Đến lúc hệ thống an ninh can thiệp thì lại chạy đi tìm bác Lao công hỏi: 'Sao bác không dọn trước?'."
         </blockquote>
 
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
         <h2>1. Trò lừa thế kỷ trên chiếc xe rác</h2>
+        <p>Tôi là <strong>Lao công</strong>.</p>
         <p>
-          Tôi là Lao Công. Công việc hàng ngày của tôi ở cái toà nhà .NET này là đi gom từng mẩu dữ liệu chết mà các anh vứt ra trên <a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals" target="_blank" rel="noopener">Managed Heap</a>.
+          Nhiệm vụ của tôi trong cái tòa nhà .NET đồ sộ này là kéo chiếc xe rác đi quanh <strong>Managed Heap</strong>, gom những object không còn được chương trình tham chiếu tới và thu hồi bộ nhớ của chúng.
         </p>
+        <p>Nhiều anh mới vào nghề nhìn tôi bằng ánh mắt sùng bái:</p>
+        <blockquote>
+          "C# nhàn thật, có bác lo hết chuyện bộ nhớ!"
+        </blockquote>
+        <p>Các anh nhầm to.</p>
         <p>
-          Nhiều anh mới vào nghề nhìn tôi với ánh mắt sùng bái: <em>"C# sướng thật, có bác lo hết bộ nhớ!"</em>. Các anh nhầm to. Tôi chỉ dọn những thứ <strong>thực sự tồn tại</strong>. Còn trò lừa đảo kiểu này thì tôi chịu:
+          Tôi chỉ xử lý <strong>bộ nhớ của những object đã không còn được sử dụng</strong>. Tôi không chịu trách nhiệm bảo đảm rằng mọi reference các anh đang cầm đều trỏ tới một object hợp lệ.
         </p>
+        <p>Ví dụ:</p>
 
         <pre><code>User user = GetUser();
+
 Console.WriteLine(user.Name); // BÙM!</code></pre>
 
         <p>
-          Các anh tưởng tượng xem: Các anh đưa cho thằng CPU một cái hộp rỗng không có gì bên trong (địa chỉ <code>0x00000000</code>). Xong các anh bảo nó: <em>"Mở hộp ra lấy cái tên cho tao"</em>.
+          Nếu <code>GetUser()</code> trả về <code>null</code>, biến <code>user</code> không chứa địa chỉ của một <code>User</code> object nào cả.
+        </p>
+        <p>Nói theo ngôn ngữ của tòa nhà:</p>
+        <p>Các anh vừa cầm một tờ giấy ghi:</p>
+
+        <pre><code>"Phòng: không có"</code></pre>
+
+        <p>rồi quay sang bảo hệ thống:</p>
+        <blockquote>
+          "Đi vào phòng đó lấy cho tao cái bảng tên <code>Name</code>."
+        </blockquote>
+        <p>Nhưng phòng đó <strong>không tồn tại</strong>.</p>
+        <p>Đây chính là điểm quan trọng:</p>
+        <p><strong>GC không phải người gây ra <code>NullReferenceException</code>.</strong></p>
+        <p>
+          GC quản lý vòng đời và thu hồi bộ nhớ của các object không còn được tham chiếu. Nó không có nhiệm vụ biến <code>null</code> thành một object, cũng không có nhiệm vụ kiểm tra xem một reference có đang trỏ tới object hay không.
         </p>
         <p>
-          CPU chạy tới, mở nắp ra thấy một khoảng không đen ngòm. Nó không biết làm gì tiếp theo, nó hoảng loạn, nó kích hoạt ngay <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/vm/exceptionhandling.cpp" target="_blank" rel="noopener">mã ngắt bảo vệ bộ nhớ của hệ điều hành</a>. Cả toà nhà mất điện. Server sập. Khách hàng gào thét.
+          Khi code cố truy cập thành viên thông qua một reference <code>null</code>, <strong>runtime</strong> mới là bên phát hiện và xử lý tình huống đó.
         </p>
+        <p>Kết quả cuối cùng mà ứng dụng nhìn thấy là:</p>
 
-        <div class="callout-warning">
-          <strong>Thông báo tử trận:</strong><br>
-          <code>System.NullReferenceException: Object reference not set to an instance of an object.</code>
-        </div>
+        <pre><code>System.NullReferenceException:
+Object reference not set to an instance of an object.</code></pre>
 
+        <p>Thế là ticket được mở.</p>
+        <p>Và người đầu tiên bị réo tên vẫn là tôi:</p>
+        <blockquote>
+          "Ủa bác Lao công quản lý bộ nhớ kiểu gì mà app crash?"
+        </blockquote>
+        <p>Tôi chỉ muốn nói:</p>
+        <blockquote>
+          <strong>"Tôi dọn rác. Tôi không xây phòng cho các anh."</strong>
+        </blockquote>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
+        <h2>2. Nhưng khoan — có phải CPU thật sự "đâm vào hố đen" rồi giật cầu dao?</h2>
+        <p>Đây là chỗ câu chuyện thường bị kể quá tay.</p>
         <p>
-          Các anh quay sang bảo: <em>"Ủa sao app crash vô lý vậy bác?"</em>.<br>
-          Tôi đứng dựa chổi cười khẩy: <strong>Thế các anh thò tay vào cõi hư vô thì đòi bốc ra cái gì?</strong>
-        </p>
-
-        <h2>2. Dấu chấm than ! – Khi các anh bịt mắt thằng Compiler</h2>
-        <p>
-          Từ bản C# 8, thằng bảo vệ cổng <a href="https://learn.microsoft.com/en-us/dotnet/csharp/nullable-references" target="_blank" rel="noopener">Roslyn Compiler</a> đã có lòng tốt nhắc nhở: <em>"Anh ơi, hàm <code>GetUser()</code> này em thấy nó dễ trả về null lắm, anh cẩn thận đấy."</em>
-        </p>
-        <p>
-          Thế là các anh làm gì? Các anh không thèm viết một dòng <code>if</code> nào để kiểm tra. Các anh tiện tay quẳng thêm một dấu chấm than <code>!</code>:
-        </p>
-
-        <pre><code>Console.WriteLine(user!.Name); // Thêm dấu ! cho đỡ ngứa mắt</code></pre>
-
-        <p>
-          Dấu <code>!</code> này sách vở gọi là <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-forgiving" target="_blank" rel="noopener">Null-forgiving operator</a>. Nhưng với tôi, nó là <strong>hành vi làm giả lời thề</strong>.
+          Khi chương trình thực hiện một thao tác thông qua reference <code>null</code>, <strong>.NET runtime phải phát hiện hành vi truy cập không hợp lệ và tạo ra <code>NullReferenceException</code></strong>.
         </p>
         <p>
-          Các anh bảo với thằng Compiler: <em>"Tao thề bằng danh dự là nó không null, mày câm mồm đi!"</em>. Thằng Compiler hiền lành gật đầu cho qua cổng. Nhưng khi chạy thật (Runtime), danh dự của các anh rơi xuống sàn cùng với cái server. Compiler thì đứng ngoài phủi tay: <em>"Thì tại anh thề chứ em có biết gì đâu!"</em>.
+          Ở mức triển khai thấp hơn, runtime/JIT có thể tận dụng cơ chế bảo vệ bộ nhớ của hệ điều hành và CPU để phát hiện một số trường hợp truy cập địa chỉ không hợp lệ. Trên Windows, cơ chế này liên quan tới <strong>access violation</strong>; trên Unix-like systems, một lỗi truy cập bộ nhớ có thể biểu hiện qua <strong>SIGSEGV</strong> (được xử lý tại <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/vm/exceptionhandling.cpp" target="_blank" rel="noopener"><code>exceptionhandling.cpp</code></a> trong CoreCLR).
         </p>
+        <p>Sau đó, .NET xử lý tình huống này theo cơ chế exception handling của runtime và đưa nó lên thành:</p>
 
-        <h2>3. Lời khuyên của một kẻ dọn rác già</h2>
+        <pre><code>NullReferenceException</code></pre>
+
+        <p>Vì vậy, cách nói chính xác hơn là:</p>
+        <blockquote>
+          <strong>CPU/OS có thể tham gia vào việc phát hiện một truy cập bộ nhớ không hợp lệ, còn .NET runtime chịu trách nhiệm biến tình huống đó thành exception mà chương trình .NET quan sát được.</strong>
+        </blockquote>
+        <p>Đừng gọi nó đơn giản là:</p>
+        <blockquote>
+          "CPU bị Null nên giật Hardware Interrupt rồi tắt server."
+        </blockquote>
+        <p>Đó là cách kể dễ hình dung nhưng không chính xác về mặt kỹ thuật.</p>
+        <p><strong><code>NullReferenceException</code> cũng không đồng nghĩa với việc toàn bộ server bị "cầu dao phần cứng" ngắt.</strong></p>
         <p>
-          Muốn tôi đỡ phải đi tăng ca dọn xác app của các anh vào cuối tuần, làm ơn nhớ 2 điều cơ bản này:
+          Thông thường, exception chỉ làm <strong>thread đang thực thi</strong> bị lỗi. Nếu exception không được xử lý và lan tới mức làm kết thúc process, thì <strong>process đó</strong> có thể bị terminate. Server vật lý không vì thế mà bị tắt.
         </p>
+        <p>Nói theo ngôn ngữ tòa nhà:</p>
+        <blockquote>
+          <strong>Hệ thống an ninh không tắt điện cả tòa nhà. Nó chỉ xử lý nhân viên vừa cố mở một cánh cửa không hợp lệ.</strong>
+        </blockquote>
 
-        <h3>① Dùng chiếc dù cứu sinh <code>?.</code> và cái phao <code>??</code>:</h3>
-        <pre><code>// Có người thật thì lấy tên, không có thì ghi "Vô danh", đừng có phá cổng!
-string name = user?.Name ?? "Vô danh";</code></pre>
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
 
-        <h3>② Dữ liệu từ ngoài vào là phải cảnh giác:</h3>
+        <h2>3. Dấu chấm than ! – Khi các anh bịt mắt thằng Gác cổng</h2>
+        <p>Từ C# 8, tòa nhà có thêm một lớp bảo vệ quan trọng:</p>
+        <p><strong>Nullable Reference Types (NRT).</strong></p>
         <p>
-          Từ database lên, từ client gửi sang, từ file đọc vào... tất cả đều có thể là <code>null</code>. Đừng tin bố con thằng nào cả. Kiểm tra ngay từ cửa ngõ trước khi cho nó đi sâu vào trong ruột hệ thống.
+          Roslyn Compiler bắt đầu phân tích flow của reference và cảnh báo khi code có khả năng sử dụng một giá trị <code>null</code> như thể nó chắc chắn không <code>null</code>.
+        </p>
+        <p>Ví dụ:</p>
+
+        <pre><code>User? user = GetUser();
+
+Console.WriteLine(user.Name);</code></pre>
+
+        <p>Compiler có thể cảnh báo rằng:</p>
+
+        <pre><code>Dereference of a possibly null reference.</code></pre>
+
+        <p>Thằng Gác cổng đang túm cổ áo các anh:</p>
+        <blockquote>
+          "Khoan! Em nghi cái địa chỉ này không có phòng. Kiểm tra lại trước khi vào!"
+        </blockquote>
+        <p>Và các anh có một cách rất tiện:</p>
+
+        <pre><code>Console.WriteLine(user!.Name);</code></pre>
+
+        <p>Đây chính là <strong>null-forgiving operator</strong>.</p>
+        <p>Dấu <code>!</code> không làm <code>user</code> hết <code>null</code>.</p>
+        <p>Nó cũng <strong>không tạo object</strong>.</p>
+        <p>Nó cũng <strong>không thêm runtime null check</strong>.</p>
+        <p>Nó chỉ nói với compiler:</p>
+        <blockquote>
+          "Ở chỗ này, tao khẳng định reference này không null. Đừng cảnh báo tao nữa."
+        </blockquote>
+        <p>Nói theo ngôn ngữ tòa nhà:</p>
+        <blockquote>
+          "Tao lấy danh dự nghề nghiệp ra thề là phòng này có thật. Mày mở cổng đi."
+        </blockquote>
+        <p>Thằng Gác cổng tin lời và ngừng cảnh báo.</p>
+        <p>Nhưng phía sau cổng, <strong>runtime vẫn không bị lời thề đó đánh lừa</strong>.</p>
+        <p>Nếu giá trị thực tế vẫn là <code>null</code>:</p>
+
+        <pre><code>User? user = null;
+
+Console.WriteLine(user!.Name);</code></pre>
+
+        <p>thì <code>!</code> không cứu được chương trình.</p>
+        <p>Nó chỉ làm <strong>compiler bớt cảnh báo</strong>.</p>
+        <p>Runtime vẫn có thể ném:</p>
+
+        <pre><code>NullReferenceException</code></pre>
+
+        <p>Nói cách khác:</p>
+        <blockquote>
+          <strong><code>!</code> là lời cam kết với compiler, không phải hợp đồng với runtime.</strong>
+        </blockquote>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
+        <h2>4. Bác Lao công thực sự làm gì?</h2>
+        <p>Đây là phần cần phân biệt thật rõ.</p>
+        <p>
+          Tôi — <strong>GC</strong> — phụ trách việc thu hồi bộ nhớ của những object không còn khả năng được chương trình truy cập thông qua các reference còn sống.
+        </p>
+        <p>Ví dụ:</p>
+
+        <pre><code>var user = new User();
+user = null;</code></pre>
+
+        <p>
+          Sau khi reference cuối cùng tới object không còn tồn tại, object đó có thể trở thành <strong>eligible for garbage collection</strong>.
+        </p>
+        <p>Đến một thời điểm thích hợp, GC có thể thu hồi bộ nhớ của object đó.</p>
+        <p>Nhưng:</p>
+
+        <pre><code>User? user = null;
+
+Console.WriteLine(user.Name);</code></pre>
+
+        <p>lại là một câu chuyện hoàn toàn khác.</p>
+        <p>Ở đây không nhất thiết có một object vừa bị GC "dọn mất".</p>
+        <p>Ngay từ đầu, <code>user</code> đã mang giá trị <code>null</code>.</p>
+        <p>Vì vậy:</p>
+
+        <pre><code>null
+≠
+object đã bị GC thu hồi</code></pre>
+
+        <p>Đây là một trong những hiểu lầm phổ biến nhất khi mới học managed memory.</p>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
+        <h2>5. ?. và ?? – Hai dụng cụ tôi muốn thấy trước khi các anh gọi tôi</h2>
+        <p>Nếu một reference <strong>có thể null</strong>, hãy xử lý khả năng đó một cách rõ ràng.</p>
+        <p>Ví dụ:</p>
+
+        <pre><code>string name = user?.Name ?? "Vô danh";</code></pre>
+
+        <p>Có thể đọc câu này như sau:</p>
+        <blockquote>
+          "Nếu <code>user</code> tồn tại thì lấy <code>Name</code>. Nếu <code>user</code> là <code>null</code>, kết quả là <code>null</code>; nếu kết quả cuối cùng vẫn là <code>null</code>, dùng <code>"Vô danh"</code>."
+        </blockquote>
+        <p>Hai toán tử ở đây đảm nhiệm hai việc khác nhau:</p>
+
+        <h3>?. — Null-conditional operator</h3>
+        <pre><code>user?.Name</code></pre>
+        <p>Cho phép truy cập <code>Name</code> theo cách có điều kiện khi <code>user</code> có thể <code>null</code>.</p>
+
+        <h3>?? — Null-coalescing operator</h3>
+        <pre><code>value ?? fallback</code></pre>
+        <p>Có nghĩa: <em>Nếu <code>value</code> là <code>null</code>, sử dụng <code>fallback</code>.</em></p>
+
+        <p>Kết hợp:</p>
+        <pre><code>string name = user?.Name ?? "Vô danh";</code></pre>
+        <p>
+          thì các anh đã xử lý trường hợp <code>user</code> không tồn tại ngay tại chỗ sử dụng nó.
+        </p>
+        <p>Không cần bắt tôi chạy tới hiện trường sau khi server đã phát nổ.</p>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
+        <h2>6. Boundary Check – Đừng để địa chỉ ma đi sâu vào tòa nhà</h2>
+        <p>Một bài học còn quan trọng hơn việc thuộc lòng <code>?.</code> và <code>??</code> là:</p>
+        <blockquote>
+          <strong>Đừng để dữ liệu không đáng tin cậy đi sâu vào hệ thống mà không xác định rõ trạng thái của nó.</strong>
+        </blockquote>
+        <p>Dữ liệu có thể đến từ:</p>
+        <ul>
+          <li>Database</li>
+          <li>HTTP request</li>
+          <li>Client</li>
+          <li>File</li>
+          <li>Message queue</li>
+          <li>API khác</li>
+          <li>Configuration</li>
+          <li>Cache</li>
+          <li>User input</li>
+        </ul>
+
+        <p>Ví dụ:</p>
+        <pre><code>User? user = await repository.GetUserAsync(id);</code></pre>
+
+        <p>Nếu contract của phương thức cho phép kết quả là <code>null</code>, hãy thể hiện điều đó:</p>
+        <pre><code>User? user = await repository.GetUserAsync(id);</code></pre>
+
+        <p>Sau đó xử lý:</p>
+        <pre><code>if (user is null)
+{
+    // xử lý trường hợp không tìm thấy user
+    return;
+}
+
+Console.WriteLine(user.Name);</code></pre>
+
+        <p>
+          Hoặc nếu nghiệp vụ thực sự yêu cầu user <strong>bắt buộc phải tồn tại</strong>, hãy biến điều kiện đó thành một invariant rõ ràng ở boundary thích hợp.
+        </p>
+        <p>Ví dụ:</p>
+        <pre><code>User user = await repository.GetRequiredUserAsync(id);</code></pre>
+
+        <p>Khi đó, contract của API thể hiện rõ hơn:</p>
+        <blockquote>
+          "Đi vào đây thì hoặc có User, hoặc phương thức phải báo lỗi."
+        </blockquote>
+        <p>
+          Đừng để một <code>null</code> lang thang từ tầng database → service → controller → business logic → UI rồi đến tận dòng cuối cùng mới phát hiện.
         </p>
 
-        <div class="references-box">
-          <h3>📚 Bằng chứng thu thập tại hiện trường (References)</h3>
-          <ul>
-            <li>
-              📄 <strong>Hồ sơ CLR CoreLib:</strong> Xem định nghĩa nguyên bản của ngoại lệ này tại <a href="https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/NullReferenceException.cs" target="_blank" rel="noopener">NullReferenceException.cs</a> trên kho mã nguồn <code>dotnet/runtime</code>.
-            </li>
-            <li>
-              ⚙️ <strong>Hiện trường xử lý ngắt C++:</strong> Đọc mã nguồn C++ của máy ảo CLR tại <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/vm/exceptionhandling.cpp" target="_blank" rel="noopener">exceptionhandling.cpp</a> để thấy cách .NET tóm lấy tín hiệu vi phạm vùng nhớ phần cứng (Access Violation / SIGSEGV) và ném ra Exception.
-            </li>
-            <li>
-              📜 <strong>Quy chuẩn kiến trúc máy ảo:</strong> <a href="https://www.ecma-international.org/publications-and-standards/standards/ecma-335/" target="_blank" rel="noopener">ECMA-335 Common Language Infrastructure (CLI)</a> – Partition I (Mục 8.2: Hệ thống kiểu và con trỏ đối tượng).
-            </li>
-            <li>
-              🎙️ <strong>Lời trăn trối của tác giả:</strong> Xem bài phát biểu kinh điển của <strong>Sir Tony Hoare</strong>: <a href="https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare/" target="_blank" rel="noopener">Null References: The Billion Dollar Mistake</a> – người phát minh ra <code>null</code> từ năm 1965 và gọi đây là <em>"sai lầm tỷ đô của nhân loại"</em>.
-            </li>
-          </ul>
-        </div>
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
+        <h2>7. Phân vai lại cho cả tòa nhà</h2>
+        <p>Để khỏi tiếp tục đổ oan cho nhau, phân công như sau:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nhân vật</th>
+              <th>Công việc</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Roslyn Compiler</strong></td>
+              <td>Phân tích code và cảnh báo các khả năng <code>null</code> khi Nullable Reference Types được bật</td>
+            </tr>
+            <tr>
+              <td><strong><code>!</code></strong></td>
+              <td>Nói với compiler rằng programmer tin reference tại vị trí đó không <code>null</code></td>
+            </tr>
+            <tr>
+              <td><strong>.NET Runtime</strong></td>
+              <td>Thực thi code và xử lý các tình huống runtime, bao gồm việc phát sinh <a href="https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/NullReferenceException.cs" target="_blank" rel="noopener"><code>NullReferenceException</code></a></td>
+            </tr>
+            <tr>
+              <td><strong>OS / CPU</strong></td>
+              <td>Cung cấp cơ chế bảo vệ bộ nhớ và xử lý các lỗi truy cập bộ nhớ ở tầng thấp</td>
+            </tr>
+            <tr>
+              <td><strong>GC</strong></td>
+              <td>Thu hồi bộ nhớ của các object không còn được sử dụng</td>
+            </tr>
+            <tr>
+              <td><strong>Developer</strong></td>
+              <td>Chịu trách nhiệm thiết kế contract, kiểm tra boundary và xử lý trạng thái <code>null</code> phù hợp</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>Và đặc biệt:</p>
+        <blockquote>
+          <strong>GC không phải "thủ phạm" của <code>NullReferenceException</code>.</strong>
+        </blockquote>
+        <p>
+          GC có thể liên quan đến <strong>lifetime của object</strong>, nhưng <code>null reference</code> và <strong>object đã được garbage-collected</strong> là hai khái niệm khác nhau.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 32px 0;">
+
+        <h2>8. Lời kết của một kẻ dọn rác già</h2>
+        <p>Tôi là Lao công.</p>
+        <p>Tôi không ghét <code>null</code>.</p>
+        <p><code>null</code> tồn tại vì đôi khi thế giới thật sự không có dữ liệu.</p>
+        <p>
+          Tôi chỉ ghét cảnh các anh biết một giá trị <strong>có thể không tồn tại</strong>, nhưng vẫn đưa nó vào sâu trong hệ thống rồi hy vọng người tiếp theo sẽ xử lý.
+        </p>
+        <p>Các anh có: <code>?.</code> để truy cập có điều kiện.</p>
+        <p>Các anh có: <code>??</code> để cung cấp giá trị thay thế.</p>
+        <p>Các anh có: <code>is null</code> để kiểm tra rõ ràng.</p>
+        <p>Các anh có <strong>Nullable Reference Types</strong> để compiler hỗ trợ phát hiện nhiều khả năng sử dụng <code>null</code> sai.</p>
+        <p>Và các anh có <code>!</code>.</p>
+        <p>Nhưng hãy nhớ:</p>
+        <pre><code>!</code></pre>
+        <p>không phải thuốc giải độc.</p>
+        <p>Nó chỉ là cách các anh nói với <strong>Gác cổng</strong>:</p>
+        <blockquote>
+          "Tao biết mình đang làm gì."
+        </blockquote>
+        <p>
+          Nếu ngoài thực tế các anh <strong>không biết</strong>, thì đến lúc runtime phát hiện ra sự thật, Gác cổng đã hết ca.
+        </p>
+        <p>Còn tôi?</p>
+        <p>Tôi vẫn đang đẩy chiếc xe rác quanh Managed Heap.</p>
+        <p>Đừng gọi tôi.</p>
+        <blockquote>
+          <strong>NullReferenceException không phải rác của GC.</strong><br>
+          Nó là hóa đơn runtime gửi lại cho một assumption sai.
+        </blockquote>
       </div>
     </article>
   </main>
