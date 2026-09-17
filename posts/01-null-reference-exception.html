@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[Nhật Ký Lao Công #01] NullReferenceException – Ai cho các anh thò tay vào hư vô?</title>
+  <meta name="description" content="Hồ sơ hiện trường số 01: Bóc trần thảm họa NullReferenceException trong C# và cơ chế ngắt phần cứng của .NET CLR.">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧹</text></svg>">
+</head>
+<body>
+
+  <header>
+    <div class="container header-inner">
+      <div class="logo-area">
+        <span class="logo-badge">CLR/GC</span>
+        <div class="site-title"><a href="../">Nhật Ký Lao Công</a></div>
+      </div>
+      <nav>
+        <a href="../">← Tất cả bài viết</a>
+        <a href="https://github.com/dannie203" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <article>
+      <div class="article-header">
+        <div class="post-meta">
+          <span class="tag">#CSharp</span>
+          <span class="tag">#DotNet</span>
+          <span class="tag">#Runtime</span>
+          <span>17/09/2026</span>
+        </div>
+        <h1>[Nhật Ký Lao Công #01] NullReferenceException – Ai cho các anh thò tay vào hư vô?</h1>
+      </div>
+
+      <div class="incident-box">
+        <ul>
+          <li><strong>Thời gian:</strong> 17h05 chiều thứ Sáu</li>
+          <li><strong>Hiện trường:</strong> Production Server</li>
+          <li><strong>Nạn nhân:</strong> Ứng dụng thanh toán điện tử</li>
+          <li><strong>Hung thủ:</strong> Một thanh niên Junior vừa bấm nút deploy để về quê ăn cưới</li>
+        </ul>
+      </div>
+
+      <div class="article-content">
+        <blockquote>
+          "Bạn đưa cho cỗ máy một tờ séc khống. Nó mang ra ngân hàng rút tiền không được. Thay vì đi về, nó quyết định... nổ tung cả toà nhà."
+        </blockquote>
+
+        <h2>1. Trò lừa thế kỷ trên chiếc xe rác</h2>
+        <p>
+          Tôi là Lao Công. Công việc hàng ngày của tôi ở cái toà nhà .NET này là đi gom từng mẩu dữ liệu chết mà các anh vứt ra trên <a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals" target="_blank" rel="noopener">Managed Heap</a>.
+        </p>
+        <p>
+          Nhiều anh mới vào nghề nhìn tôi với ánh mắt sùng bái: <em>"C# sướng thật, có bác lo hết bộ nhớ!"</em>. Các anh nhầm to. Tôi chỉ dọn những thứ <strong>thực sự tồn tại</strong>. Còn trò lừa đảo kiểu này thì tôi chịu:
+        </p>
+
+        <pre><code>User user = GetUser();
+Console.WriteLine(user.Name); // BÙM!</code></pre>
+
+        <p>
+          Các anh tưởng tượng xem: Các anh đưa cho thằng CPU một cái hộp rỗng không có gì bên trong (địa chỉ <code>0x00000000</code>). Xong các anh bảo nó: <em>"Mở hộp ra lấy cái tên cho tao"</em>.
+        </p>
+        <p>
+          CPU chạy tới, mở nắp ra thấy một khoảng không đen ngòm. Nó không biết làm gì tiếp theo, nó hoảng loạn, nó kích hoạt ngay <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/vm/exceptionhandling.cpp" target="_blank" rel="noopener">mã ngắt bảo vệ bộ nhớ của hệ điều hành</a>. Cả toà nhà mất điện. Server sập. Khách hàng gào thét.
+        </p>
+
+        <div class="callout-warning">
+          <strong>Thông báo tử trận:</strong><br>
+          <code>System.NullReferenceException: Object reference not set to an instance of an object.</code>
+        </div>
+
+        <p>
+          Các anh quay sang bảo: <em>"Ủa sao app crash vô lý vậy bác?"</em>.<br>
+          Tôi đứng dựa chổi cười khẩy: <strong>Thế các anh thò tay vào cõi hư vô thì đòi bốc ra cái gì?</strong>
+        </p>
+
+        <h2>2. Dấu chấm than ! – Khi các anh bịt mắt thằng Compiler</h2>
+        <p>
+          Từ bản C# 8, thằng bảo vệ cổng <a href="https://learn.microsoft.com/en-us/dotnet/csharp/nullable-references" target="_blank" rel="noopener">Roslyn Compiler</a> đã có lòng tốt nhắc nhở: <em>"Anh ơi, hàm <code>GetUser()</code> này em thấy nó dễ trả về null lắm, anh cẩn thận đấy."</em>
+        </p>
+        <p>
+          Thế là các anh làm gì? Các anh không thèm viết một dòng <code>if</code> nào để kiểm tra. Các anh tiện tay quẳng thêm một dấu chấm than <code>!</code>:
+        </p>
+
+        <pre><code>Console.WriteLine(user!.Name); // Thêm dấu ! cho đỡ ngứa mắt</code></pre>
+
+        <p>
+          Dấu <code>!</code> này sách vở gọi là <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-forgiving" target="_blank" rel="noopener">Null-forgiving operator</a>. Nhưng với tôi, nó là <strong>hành vi làm giả lời thề</strong>.
+        </p>
+        <p>
+          Các anh bảo với thằng Compiler: <em>"Tao thề bằng danh dự là nó không null, mày câm mồm đi!"</em>. Thằng Compiler hiền lành gật đầu cho qua cổng. Nhưng khi chạy thật (Runtime), danh dự của các anh rơi xuống sàn cùng với cái server. Compiler thì đứng ngoài phủi tay: <em>"Thì tại anh thề chứ em có biết gì đâu!"</em>.
+        </p>
+
+        <h2>3. Lời khuyên của một kẻ dọn rác già</h2>
+        <p>
+          Muốn tôi đỡ phải đi tăng ca dọn xác app của các anh vào cuối tuần, làm ơn nhớ 2 điều cơ bản này:
+        </p>
+
+        <h3>① Dùng chiếc dù cứu sinh <code>?.</code> và cái phao <code>??</code>:</h3>
+        <pre><code>// Có người thật thì lấy tên, không có thì ghi "Vô danh", đừng có phá cổng!
+string name = user?.Name ?? "Vô danh";</code></pre>
+
+        <h3>② Dữ liệu từ ngoài vào là phải cảnh giác:</h3>
+        <p>
+          Từ database lên, từ client gửi sang, từ file đọc vào... tất cả đều có thể là <code>null</code>. Đừng tin bố con thằng nào cả. Kiểm tra ngay từ cửa ngõ trước khi cho nó đi sâu vào trong ruột hệ thống.
+        </p>
+
+        <div class="references-box">
+          <h3>📚 Bằng chứng thu thập tại hiện trường (References)</h3>
+          <ul>
+            <li>
+              📄 <strong>Hồ sơ CLR CoreLib:</strong> Xem định nghĩa nguyên bản của ngoại lệ này tại <a href="https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/NullReferenceException.cs" target="_blank" rel="noopener">NullReferenceException.cs</a> trên kho mã nguồn <code>dotnet/runtime</code>.
+            </li>
+            <li>
+              ⚙️ <strong>Hiện trường xử lý ngắt C++:</strong> Đọc mã nguồn C++ của máy ảo CLR tại <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/vm/exceptionhandling.cpp" target="_blank" rel="noopener">exceptionhandling.cpp</a> để thấy cách .NET tóm lấy tín hiệu vi phạm vùng nhớ phần cứng (Access Violation / SIGSEGV) và ném ra Exception.
+            </li>
+            <li>
+              📜 <strong>Quy chuẩn kiến trúc máy ảo:</strong> <a href="https://www.ecma-international.org/publications-and-standards/standards/ecma-335/" target="_blank" rel="noopener">ECMA-335 Common Language Infrastructure (CLI)</a> – Partition I (Mục 8.2: Hệ thống kiểu và con trỏ đối tượng).
+            </li>
+            <li>
+              🎙️ <strong>Lời trăn trối của tác giả:</strong> Xem bài phát biểu kinh điển của <strong>Sir Tony Hoare</strong>: <a href="https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare/" target="_blank" rel="noopener">Null References: The Billion Dollar Mistake</a> – người phát minh ra <code>null</code> từ năm 1965 và gọi đây là <em>"sai lầm tỷ đô của nhân loại"</em>.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>© 2026 Nhật Ký Lao Công (aki.is-a.dev) • Vận hành trên GitHub Pages</p>
+    </div>
+  </footer>
+
+</body>
+</html>
