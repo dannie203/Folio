@@ -1,0 +1,10 @@
+{
+  "name": "folio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Folio Web Application & Zero-Knowledge Security Audit",
+  "scripts": {
+    "test": "node --test tests/security/**/*.test.mjs",
+    "test:security": "node --test tests/security/**/*.test.mjs"
+  }
+}

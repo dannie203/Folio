@@ -8,6 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Web%20PWA-3B82F6?style=for-the-badge&logo=pwa&logoColor=white)](https://aki.is-a.dev)
 [![Hosting](https://img.shields.io/badge/Hosted%20On-GitHub%20Pages-181717?style=for-the-badge&logo=githubpages&logoColor=white)](https://pages.github.com)
 [![Privacy Vault](https://img.shields.io/badge/Privacy-AES--256--GCM-A855F7?style=for-the-badge&logo=shield&logoColor=white)](https://aki.is-a.dev/security)
+[![Zero-Knowledge Audit](https://github.com/dannie203/Folio/actions/workflows/security-audit.yml/badge.svg)](https://github.com/dannie203/Folio/actions/workflows/security-audit.yml)
 
 <p align="center">
   <a href="#-about-folio">About</a> •
@@ -63,6 +64,26 @@ Folio operates on a strict **Zero-Knowledge** model:
 - **Client-Side Encryption**: Reading progress, bookmarks, private notes, and shelf metadata are encrypted directly on your device using hardware-accelerated **AES-256-GCM** (PBKDF2 with 100,000 SHA-256 rounds).
 - **Zero Server Exposure**: Cloud synchronization layers receive only blind Base64 ciphertext. Even in the event of a server breach or legal subpoena, your reading activity cannot be deciphered.
 - **Independent Verification**: Anyone can verify the cryptographic handshake locally by running our standalone audit script on the [/security](https://aki.is-a.dev/security) page.
+
+---
+
+## 🛡️ Automated Adversarial Security Verification
+
+Folio does not rely on marketing claims. Our security and privacy guarantees are deterministically verified through automated adversarial tests simulating real-world threat actors:
+
+| Test Suite | Adversarial Threat Model | Verification Result |
+| :--- | :--- | :--- |
+| **1. Reader Sandbox & Anti-Spoofing** | Untrusted EPUB scripts attempting cross-window manipulation or token extraction | ✅ Blocked & Rejected (`REJECTED_SPOOFED_SOURCE`) |
+| **2. Zero-Knowledge Server Blindness** | Cloud storage & network eavesdroppers inspecting payloads | ✅ 0 Bytes Plaintext Leaked (Ciphertext only, UUID filenames) |
+| **3. AES-256-GCM Tamper Resistance** | Active man-in-the-middle bit-flip & integrity tampering attacks | ✅ Immediate Cryptographic Authentication Failure (`OperationError`) |
+
+### Run Tests Locally (Zero External Dependencies)
+You can clone this repository and run the native WebCrypto test suite using any modern Node.js runtime (v20+):
+```bash
+git clone https://github.com/dannie203/Folio.git
+cd Folio
+npm test
+```
 
 ---
 
